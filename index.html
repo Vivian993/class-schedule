@@ -147,6 +147,30 @@
   tr.break td, tr.break th{background:#F5F3EC; color:#9AA292; font-size:11px;}
   td.cell.today-col{background:#FBF3E9;}
 
+  .cal-header{
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;
+  }
+  .cal-header h3{margin:0; font-size:16px; font-family:'Space Grotesk', sans-serif;}
+  .cal-grid{
+    display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; text-align:center;
+  }
+  .cal-day-head{
+    font-size:11px; font-weight:700; color:var(--muted); padding:6px 0;
+  }
+  .cal-cell{
+    min-height:48px; border-radius:8px; padding:4px 2px; position:relative;
+    background:var(--board-2); border:1px solid transparent; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  }
+  .cal-cell.other-month{opacity:0.35; background:transparent;}
+  .cal-cell.today{border-color:var(--copper); font-weight:700;}
+  .cal-cell.selected{background:var(--copper); color:#1a1208;}
+  .cal-cell.selected .cal-num{color:#1a1208;}
+  .cal-num{font-size:13px; font-family:'Space Grotesk';}
+  .cal-dots{display:flex; gap:2px; margin-top:4px;}
+  .cal-dot{width:4px; height:4px; border-radius:50%; background:var(--copper);}
+  .cal-cell.selected .cal-dot{background:#1a1208;}
+
   .ev-item{
     display:flex; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line);
   }
@@ -210,7 +234,7 @@
       <div class="chip"></div>
       <div>
         <h1>課表控制台</h1>
-        <div class="sub">電子科．每天 19:00 自動送出明天的課</div>
+        <div class="sub">電子科．每天 18:00 自動送出明天的課</div>
       </div>
     </div>
     <div class="header-toggles">
@@ -221,7 +245,7 @@
   <nav>
     <button data-view="home" class="active">今天</button>
     <button data-view="week">整週課表</button>
-    <button data-view="calendar">行事曆</button>
+    <button data-view="calendar">日曆與行程</button>
     <button data-view="settings">設定與發送</button>
   </nav>
   <div class="rail blue">
@@ -270,13 +294,22 @@
   <!-- CALENDAR -->
   <section class="view" id="view-calendar">
     <div class="card">
+      <div class="cal-header">
+        <button class="btn small ghost" id="cal-prev">◀ 上個月</button>
+        <h3 id="cal-month-title">2026 年 8 月</h3>
+        <button class="btn small ghost" id="cal-next">下個月 ▶</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <div class="card">
       <h2>➕ 新增行程</h2>
       <p class="desc">例如段考、模擬考、繳費、社團活動。若日期在 3 天內，系統會排定 ntfy 預約發送；超過 3 天的話，App 打開時會自動補排。</p>
       <label>標題</label>
       <input type="text" id="ev-title" placeholder="例如：第一次段考">
       <div class="row2">
         <div><label>日期</label><input type="date" id="ev-date"></div>
-        <div><label>時間</label><input type="time" id="ev-time" value="19:00"></div>
+        <div><label>時間</label><input type="time" id="ev-time" value="18:00"></div>
       </div>
       <label>備註（選填）</label>
       <input type="text" id="ev-note" placeholder="例如：記得帶尺、計算機">
@@ -285,7 +318,7 @@
     </div>
 
     <div class="card">
-      <h2>📌 已排定的行程</h2>
+      <h2 id="ev-list-title">📌 行程列表</h2>
       <div id="ev-list"></div>
     </div>
   </section>
@@ -309,11 +342,11 @@
     </div>
 
     <div class="card">
-      <h2>⏰ 每天 19:00 自動傳送（保底排程設定）</h2>
+      <h2>⏰ 每天 18:00 自動傳送（超簡單設定法）</h2>
       <p class="desc">
-        要讓孩子手機每天晚上 19:00 準時收到明天課表，最穩定的方法是免費註冊 <a href="https://cron-job.org" target="_blank" style="color:var(--copper);">cron-job.org</a>。點擊下方按鈕可產生專屬設定值，直接複製貼上即可！
+        只要到 <a href="https://cron-job.org" target="_blank" style="color:var(--copper);">cron-job.org</a> 新增 Job，在 **URL** 欄位直接貼上下方為您組合好的「完整網址」即可，不需要再填寫 Headers 或 Body！
       </p>
-      <button class="btn primary" id="btn-gen-cron">產生 5 組每日排程設定</button>
+      <button class="btn primary" id="btn-gen-cron">產生一鍵發送專屬網址</button>
       <div id="cron-output"></div>
     </div>
   </section>
@@ -371,6 +404,8 @@
   let EVENTS = [];
   let SOUND_ON = true;
   let THEME_DARK = false;
+  let currentCalDate = new Date();
+  let selectedCalDateStr = null;
 
   async function getPersonal(key, fallback){
     if(HAS_CLAUDE_STORAGE){
@@ -460,13 +495,14 @@
     if(!day) return [];
     const lines = [];
     for(const p of PERIODS){
-      if(!p.isClass){ continue; }
+      if(p.isClass === false){ continue; }
       const info = day[p.id];
       if(!info || !info[0]) continue;
       lines.push(`${p.label} ${p.time}｜${info[0]}${info[1] ? '（'+info[1]+'）':''}`);
     }
     return lines;
   }
+
   function dayScheduleText(dow){
     const lines = dayScheduleLines(dow);
     if(lines.length===0) return '明天是週末，沒有安排課程喔！🎉';
@@ -507,7 +543,7 @@
     }
     html += '</tr></thead><tbody>';
     for(const p of PERIODS){
-      if(!p.isClass){
+      if(!p.isClass && p.isClass !== undefined){
         html += `<tr class="break"><th>${p.label}<span class="time">${p.time}</span></th>`;
         for(let d=1;d<=5;d++) html += `<td>—</td>`;
         html += '</tr>';
@@ -526,10 +562,106 @@
     $('#week-table').innerHTML = html;
   }
 
+  function renderCalendar(){
+    const year = currentCalDate.getFullYear();
+    const month = currentCalDate.getMonth();
+    $('#cal-month-title').textContent = `${year} 年 ${month + 1} 月`;
+
+    const grid = $('#cal-grid');
+    grid.innerHTML = '';
+
+    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+    weekDays.forEach(wd => {
+      grid.innerHTML += `<div class="cal-day-head">${wd}</div>`;
+    });
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDayOfWeek = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const evDatesMap = {};
+    EVENTS.forEach(ev => {
+      const dStr = new Date(ev.ts).toISOString().split('T')[0];
+      evDatesMap[dStr] = (evDatesMap[dStr] || 0) + 1;
+    });
+
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const dNum = prevMonthLastDay - i;
+      grid.innerHTML += `<div class="cal-cell other-month"><span class="cal-num">${dNum}</span></div>`;
+    }
+
+    for (let d = 1; d <= totalDays; d++) {
+      const dObj = new Date(year, month, d);
+      const yyyy = dObj.getFullYear();
+      const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(dObj.getDate()).padStart(2, '0');
+      const dStr = `${yyyy}-${mm}-${dd}`;
+
+      const isToday = dStr === todayStr;
+      const isSelected = dStr === selectedCalDateStr;
+      const evCount = evDatesMap[dStr] || 0;
+
+      let dotsHtml = '';
+      if(evCount > 0){
+        dotsHtml = '<div class="cal-dots">' + '<div class="cal-dot"></div>'.repeat(Math.min(evCount, 3)) + '</div>';
+      }
+
+      const cell = document.createElement('div');
+      cell.className = `cal-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`;
+      cell.innerHTML = `<span class="cal-num">${d}</span>${dotsHtml}`;
+      cell.addEventListener('click', () => {
+        if(selectedCalDateStr === dStr){
+          selectedCalDateStr = null;
+        } else {
+          selectedCalDateStr = dStr;
+          $('#ev-date').value = dStr;
+        }
+        renderCalendar();
+        renderEvents();
+      });
+      grid.appendChild(cell);
+    }
+
+    const totalRendered = startDayOfWeek + totalDays;
+    const remaining = (7 - (totalRendered % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      grid.innerHTML += `<div class="cal-cell other-month"><span class="cal-num">${i}</span></div>`;
+    }
+  }
+
+  $('#cal-prev').addEventListener('click', () => {
+    currentCalDate.setMonth(currentCalDate.getMonth() - 1);
+    renderCalendar();
+  });
+  $('#cal-next').addEventListener('click', () => {
+    currentCalDate.setMonth(currentCalDate.getMonth() + 1);
+    renderCalendar();
+  });
+
   function renderEvents(){
     const list = $('#ev-list');
-    if(EVENTS.length===0){ list.innerHTML = '<div class="empty-state">還沒有新增行程</div>'; return; }
-    const sorted = [...EVENTS].sort((a,b)=> a.ts - b.ts);
+    let filtered = [...EVENTS];
+
+    if(selectedCalDateStr){
+      $('#ev-list-title').textContent = `📌 ${selectedCalDateStr} 當日行程`;
+      filtered = filtered.filter(ev => {
+        const dStr = new Date(ev.ts).toISOString().split('T')[0];
+        return dStr === selectedCalDateStr;
+      });
+    } else {
+      $('#ev-list-title').textContent = '📌 全部行程列表';
+    }
+
+    if(filtered.length === 0){
+      list.innerHTML = `<div class="empty-state">${selectedCalDateStr ? '該日無行程事件' : '還沒有新增行程'}</div>`;
+      return;
+    }
+
+    const sorted = filtered.sort((a,b)=> a.ts - b.ts);
     list.innerHTML = sorted.map(ev=>{
       const d = new Date(ev.ts);
       const status = ev.scheduled ? `<span class="ev-status st-scheduled">已排定 ntfy 通知</span>` : `<span class="ev-status st-far">超過 3 天，等待自動補排</span>`;
@@ -545,10 +677,12 @@
         </div>
       </div>`;
     }).join('');
+
     list.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         EVENTS = EVENTS.filter(e=>e.id!==btn.dataset.del);
         await setVal('calendar-events', EVENTS);
+        renderCalendar();
         renderEvents();
       });
     });
@@ -579,18 +713,19 @@
     let html = '';
     for(let d=1; d<=5; d++){
       const text = dayScheduleText(d);
-      const cronExpr = `0 19 * * ${CRON_DOW_FOR[d]}`;
-      const url = `https://ntfy.sh/${topic}`;
+      const cronExpr = `0 18 * * ${CRON_DOW_FOR[d]}`;
+      // 自動打包成 GET 參數網址，完全不需要填 Header 和 Body 欄位！
+      const safeTitle = encodeURIComponent(`📚 明天課表（${DAYNAMES[d]}）`);
+      const safeBody = encodeURIComponent(text);
+      const fullUrl = `https://ntfy.sh/${topic}?title=${safeTitle}&message=${safeBody}`;
+
       html += `<div class="cron-card">
-        <h3>${DAYNAMES[d]}的課（於前一天 19:00 送出）</h3>
+        <h3>${DAYNAMES[d]}的課（於前一天 18:00 送出）</h3>
         <div class="kv"><div class="k">排程</div><div class="v">${cronExpr}<button class="btn small copybtn" data-copy="${cronExpr}">複製</button></div></div>
-        <div class="kv"><div class="k">URL</div><div class="v">${url}<button class="btn small copybtn" data-copy="${url}">複製</button></div></div>
-        <div class="kv"><div class="k">Method</div><div class="v">POST</div></div>
-        <div class="kv"><div class="k">Header</div><div class="v">Title: 📚 明天課表（${DAYNAMES[d]}）<button class="btn small copybtn" data-copy="Title: 📚 明天課表（${DAYNAMES[d]}）">複製</button></div></div>
-        <div class="kv"><div class="k">內容</div><div class="v" style="white-space:pre-wrap;">${text}<button class="btn small copybtn" data-copy="${text.replace(/"/g,'&quot;')}">複製</button></div></div>
+        <div class="kv"><div class="k">完整網址</div><div class="v" style="word-break:break-all;">${fullUrl}<button class="btn small copybtn" data-copy="${fullUrl}">複製網址</button></div></div>
       </div>`;
     }
-    html = `<div class="warn-box">在 <b>cron-job.org</b> 免費註冊後，建立 5 個 Cron Job，時區選擇 <b>Asia/Taipei</b>，複製貼上各欄位即可。</div>` + html;
+    html = `<div class="warn-box">在 <b>cron-job.org</b> 新增 Job 時，只要把上方對應的<b>「完整網址」</b>貼到 <b>URL 欄位</b>，時間算式填好，方法維持 GET，直接按下 CREATE 就大功告成了！</div>` + html;
     return html;
   }
 
@@ -616,7 +751,7 @@
     const scheduleText = dayScheduleText(targetDow);
     const dayName = DAYNAMES[targetDow] || '週末';
     try{
-      await publish(TOPIC, {title:`📚 課表推播測試（${dayName}）`, body: scheduleText});
+      await publish(TOPIC, {title:`📚 明天課表（${dayName}）`, body: scheduleText});
       return true;
     }catch(e){
       throw e;
@@ -625,7 +760,6 @@
 
   $('#btn-test-schedule').addEventListener('click', async ()=>{
     try{
-      // 強制推播週一課表做功能驗證
       await sendSchedule(1);
       showStatus('#set-status','已成功發送「週一課表」至孩子手機，請查看推播！','ok');
     }catch(e){ showStatus('#set-status','送出失敗：'+e.message,'err'); }
@@ -635,7 +769,7 @@
     const tmr = new Date(); tmr.setDate(tmr.getDate()+1);
     const dow = tmr.getDay();
     try{
-      await sendSchedule(dow === 0 || dow === 6 ? 1 : dow); // 若明天是週末，自動切換為週一課表發送做驗證
+      await sendSchedule(dow === 0 || dow === 6 ? 1 : dow);
       showStatus('#home-status','明天課表通知已成功發送！','ok');
     }catch(e){ showStatus('#home-status','送出失敗：'+e.message,'err'); }
   });
@@ -653,7 +787,7 @@
   $('#btn-add-event').addEventListener('click', async ()=>{
     const title = $('#ev-title').value.trim();
     const date = $('#ev-date').value;
-    const time = $('#ev-time').value || '19:00';
+    const time = $('#ev-time').value || '18:00';
     const note = $('#ev-note').value.trim();
     if(!title || !date){ showStatus('#ev-status','請填寫標題與日期','err'); return; }
     const ts = new Date(`${date}T${time}:00`).getTime();
@@ -670,6 +804,7 @@
     EVENTS.push(ev);
     await setVal('calendar-events', EVENTS);
     $('#ev-title').value=''; $('#ev-date').value=''; $('#ev-note').value='';
+    renderCalendar();
     renderEvents();
     showStatus('#ev-status', ev.scheduled ? '已加入並排定通知' : '已加入行事曆', 'ok');
   });
@@ -690,8 +825,10 @@
     $('#set-topic').value = TOPIC;
     renderHome();
     renderWeek();
+    renderCalendar();
     renderEvents();
     await autoRescheduleUpcoming();
+    renderCalendar();
     renderEvents();
   })();
 })();
