@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>課表控制台</title>
+<!-- 📌 iPhone 桌面 App 圖示：它會去抓您上傳到 GitHub 的 custom-icon.png 照片 -->
+<link rel="apple-touch-icon" href="custom-icon.png">
+<link rel="icon" type="image/png" href="custom-icon.png">
+
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIuiqsuihqOaOp+WItuWPsCIsICJzaG9ydF9uYW1lIjogIuiqsuihqCIsICJzdGFydF91cmwiOiAiLiIsICJzY29wZSI6ICIuIiwgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwRjFCMzMiLCAidGhlbWVfY29sb3IiOiAiIzBGMUIzMyJ9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="課表">
+<meta name="theme-color" content="#0F1B33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16231C;
+    --deep:#16231C;
+    --board:#EBEEE4;
+    --board-2:#E1E5D8;
+    --surface:#FFFFFF;
+    --copper:#B5651D;
+    --copper-light:#E0A458;
+    --green:#2F6E4F;
+    --green-dark:#1F4F38;
+    --warn:#C4432E;
+    --line:#D3D8C7;
+    --muted:#5B6459;
+    --dot:rgba(22,35,28,0.06);
+  }
+  body.theme-dark{
+    --ink:#EAEDE4;
+    --deep:#0A0F14;
+    --board:#10151B;
+    --board-2:#181F27;
+    --surface:#171E26;
+    --copper:#E0A458;
+    --copper-light:#F0C68B;
+    --green:#4C8F6B;
+    --green-dark:#2E5B44;
+    --warn:#E2685A;
+    --line:#2A323C;
+    --muted:#9CA8A0;
+    --dot:rgba(234,237,228,0.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--board);
+    background-image:
+      radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 1.6px);
+    background-size:22px 22px;
+    color:var(--ink);
+    font-family:'Noto Sans TC','Inter',sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+    transition:background-color .2s, color .2s;
+  }
+  .disp{font-family:'Space Grotesk','Noto Sans TC',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  header{
+    position:sticky; top:0; z-index:20;
+    background:var(--deep);
+    padding-top:8px;
+  }
+  .rail{
+    display:flex; justify-content:space-between; padding:0 14px;
+  }
+  .rail span{
+    width:6px;height:6px;border-radius:50%;
+    background:rgba(255,255,255,0.18);
+  }
+  .rail.red span{background:rgba(196,67,46,0.55);}
+  .rail.blue span{background:rgba(70,110,200,0.5);}
+  .header-inner{
+    padding:14px 18px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .header-toggles{display:flex; gap:6px; flex:none;}
+  .toggle-btn{
+    appearance:none; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
+    color:#C9D2C6; width:34px; height:34px; border-radius:9px; font-size:15px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+  }
+  .toggle-btn.on{background:var(--copper); border-color:var(--copper); color:#1a1208;}
+  .toggle-btn:focus-visible{outline:2px solid var(--copper-light); outline-offset:2px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .chip{
+    width:34px;height:34px;border-radius:7px;
+    background:linear-gradient(145deg,var(--green),var(--green-dark));
+    border:1px solid rgba(255,255,255,0.15);
+    position:relative; flex:none;
+  }
+  .chip::before,.chip::after{
+    content:'';position:absolute;top:50%;width:6px;height:2px;background:var(--copper-light);transform:translateY(-50%);
+  }
+  .chip::before{left:-6px;} .chip::after{right:-6px;}
+  h1{color:#fff;font-size:17px;margin:0;font-weight:700;letter-spacing:.02em;}
+  .sub{color:#9FB0A2;font-size:11.5px;margin-top:2px;}
+  nav{display:flex; gap:6px; padding:0 14px 14px;}
+  nav button{
+    flex:1; appearance:none; border:1px solid rgba(255,255,255,0.14);
+    background:rgba(255,255,255,0.04); color:#C9D2C6;
+    padding:9px 6px; border-radius:9px; font-size:12.5px; font-weight:500;
+    font-family:inherit; cursor:pointer; transition:.15s;
+  }
+  nav button.active{
+    background:var(--copper); border-color:var(--copper); color:#1a1208; font-weight:700;
+  }
+  nav button:focus-visible{outline:2px solid var(--copper-light); outline-offset:2px;}
+
+  main{max-width:760px;margin:0 auto;padding:18px 14px 0;}
+  .view{display:none;} .view.active{display:block;}
+
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:16px; margin-bottom:16px;
+    box-shadow:0 1px 0 rgba(22,35,28,0.03);
+  }
+  .card h2{margin:0 0 4px; font-size:15px; display:flex; align-items:center; gap:8px;}
+  .card .desc{color:var(--muted); font-size:12.5px; margin:0 0 14px; line-height:1.6;}
+
+  .today-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background:linear-gradient(135deg,var(--green-dark),var(--green));
+    color:#fff; border-radius:14px; padding:16px 18px; margin-bottom:16px;
+  }
+  .today-banner .lab{font-size:11.5px; color:#B9D4C1; letter-spacing:.06em;}
+  .today-banner .day{font-size:20px; font-weight:700; margin-top:2px;}
+  .today-banner .cnt{font-size:11.5px; color:#B9D4C1; text-align:right;}
+  .today-banner .cnt b{display:block; font-size:22px; color:#fff; font-family:'Space Grotesk';}
+
+  .grid-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px;}
+  table{border-collapse:collapse; width:100%; min-width:640px; font-size:12.5px;}
+  th,td{border:1px solid var(--line); padding:7px 6px; text-align:center; vertical-align:middle;}
+  thead th{background:var(--deep); color:#fff; font-weight:600; padding:9px 6px;}
+  thead th.wk-active{background:var(--copper); color:#1a1208;}
+  tbody th{background:var(--board-2); font-weight:600; white-space:nowrap; font-size:11.5px;}
+  tbody th .time{display:block; font-family:'IBM Plex Mono'; font-size:10px; color:var(--muted); font-weight:400;}
+  td.cell{font-weight:500;}
+  td.cell .t{display:block; font-size:10.5px; color:var(--muted); font-weight:400; margin-top:1px;}
+  td.empty{color:#C3C9BB;}
+  tr.break td, tr.break th{background:#F5F3EC; color:#9AA292; font-size:11px;}
+  td.cell.today-col{background:#FBF3E9;}
+
+  .ev-item{
+    display:flex; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line);
+  }
+  .ev-item:last-child{border-bottom:none;}
+  .ev-date{
+    flex:none; width:52px; text-align:center; font-family:'Space Grotesk';
+  }
+  .ev-date .d{font-size:20px; font-weight:700; line-height:1;}
+  .ev-date .m{font-size:10.5px; color:var(--muted);}
+  .ev-body{flex:1; min-width:0;}
+  .ev-title{font-weight:600; font-size:14px;}
+  .ev-meta{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .ev-status{font-size:10.5px; padding:2px 7px; border-radius:20px; display:inline-block; margin-top:6px;}
+  .st-scheduled{background:#E4F1E8; color:var(--green-dark);}
+  .st-far{background:#FBEFE0; color:var(--copper);}
+  .ev-actions{flex:none; display:flex; flex-direction:column; gap:6px;}
+
+  input,textarea,select{
+    width:100%; border:1px solid var(--line); border-radius:8px; padding:9px 10px;
+    font-family:inherit; font-size:13.5px; background:#FCFCFA; color:var(--ink);
+  }
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--copper-light); border-color:var(--copper);}
+  label{font-size:12px; color:var(--muted); display:block; margin:10px 0 4px;}
+  label:first-child{margin-top:0;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+  button.btn{
+    appearance:none; border:none; border-radius:9px; padding:10px 16px;
+    font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer;
+    background:var(--deep); color:#fff;
+  }
+  button.btn.primary{background:var(--copper); color:#1a1208;}
+  button.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line); font-weight:600;}
+  button.btn.small{padding:6px 10px; font-size:11.5px; border-radius:7px;}
+  button.btn:disabled{opacity:.45; cursor:not-allowed;}
+  button.btn:focus-visible{outline:2px solid var(--copper-light); outline-offset:2px;}
+
+  .status-line{font-size:12px; margin-top:10px; padding:8px 10px; border-radius:8px; display:none;}
+  .status-line.ok{display:block; background:#E4F1E8; color:var(--green-dark);}
+  .status-line.err{display:block; background:#FBE7E3; color:var(--warn);}
+
+  .cron-card{border:1px dashed var(--line); border-radius:10px; padding:12px; margin-top:10px;}
+  .cron-card h3{margin:0 0 8px; font-size:13px; display:flex; justify-content:space-between; align-items:center;}
+  .kv{display:flex; gap:8px; align-items:flex-start; margin-bottom:6px; font-size:12px;}
+  .kv .k{flex:none; width:52px; color:var(--muted); font-family:'IBM Plex Mono'; font-size:10.5px; padding-top:6px;}
+  .kv .v{flex:1; background:#F5F3EC; border-radius:6px; padding:6px 8px; font-family:'IBM Plex Mono'; font-size:11.5px; word-break:break-all; position:relative;}
+  .copybtn{position:absolute; top:4px; right:4px; font-size:10px; padding:3px 7px;}
+
+  .empty-state{text-align:center; padding:20px 10px; color:var(--muted); font-size:13px;}
+  .warn-box{background:#FBEFE0; border:1px solid #EFD9B3; color:#7A4A0E; border-radius:10px; padding:10px 12px; font-size:12px; line-height:1.6; margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="rail red">
+    <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="chip"></div>
+      <div>
+        <h1>課表控制台</h1>
+        <div class="sub">電子科．每天 19:00 自動送出明天的課</div>
+      </div>
+    </div>
+    <div class="header-toggles">
+      <button class="toggle-btn" id="btn-sound" title="按鍵音效" aria-pressed="true">🔊</button>
+      <button class="toggle-btn" id="btn-theme" title="深色模式" aria-pressed="false">🌙</button>
+    </div>
+  </div>
+  <nav>
+    <button data-view="home" class="active">今天</button>
+    <button data-view="week">整週課表</button>
+    <button data-view="calendar">行事曆</button>
+    <button data-view="settings">設定與發送</button>
+  </nav>
+  <div class="rail blue">
+    <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- HOME -->
+  <section class="view active" id="view-home">
+    <div class="today-banner">
+      <div>
+        <div class="lab" id="home-label">今天</div>
+        <div class="day" id="home-day">—</div>
+      </div>
+      <div class="cnt"><span id="home-count-lab">今天堂數</span><b id="home-count">0</b></div>
+    </div>
+
+    <div class="card">
+      <h2>📖 今日課表</h2>
+      <p class="desc">當天各節課，含休息與午休時段。</p>
+      <div id="home-today-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>📤 明天的課（預覽推播內容）</h2>
+      <p class="desc">這就是傳到孩子手機上的訊息格式。點擊下方按鈕可立即測試推播。</p>
+      <div id="home-tomorrow-list"></div>
+      <button class="btn primary" id="btn-send-tomorrow" style="margin-top:12px;">📲 測試發送明天課表給孩子</button>
+      <div class="status-line" id="home-status"></div>
+    </div>
+  </section>
+
+  <!-- WEEK -->
+  <section class="view" id="view-week">
+    <div class="card">
+      <h2>🗓️ 整週課表</h2>
+      <p class="desc">完整的一週課表，今天的那一欄會用底色標出來。</p>
+      <div class="grid-wrap">
+        <table id="week-table"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALENDAR -->
+  <section class="view" id="view-calendar">
+    <div class="card">
+      <h2>➕ 新增行程</h2>
+      <p class="desc">例如段考、模擬考、繳費、社團活動。若日期在 3 天內，系統會排定 ntfy 預約發送；超過 3 天的話，App 打開時會自動補排。</p>
+      <label>標題</label>
+      <input type="text" id="ev-title" placeholder="例如：第一次段考">
+      <div class="row2">
+        <div><label>日期</label><input type="date" id="ev-date"></div>
+        <div><label>時間</label><input type="time" id="ev-time" value="19:00"></div>
+      </div>
+      <label>備註（選填）</label>
+      <input type="text" id="ev-note" placeholder="例如：記得帶尺、計算機">
+      <button class="btn primary" id="btn-add-event" style="margin-top:14px;">加入行事曆並排定通知</button>
+      <div class="status-line" id="ev-status"></div>
+    </div>
+
+    <div class="card">
+      <h2>📌 已排定的行程</h2>
+      <div id="ev-list"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="view-settings">
+    <div class="card">
+      <h2>🔌 連接孩子的手機</h2>
+      <p class="desc">
+        在孩子手機安裝 <b>ntfy</b> App，訂閱主題（topic），例如
+        <span class="mono">chen-family-schedule-7f2</span>。
+      </p>
+      <label>ntfy 主題名稱（topic）</label>
+      <input type="text" id="set-topic" placeholder="例如：chen-family-schedule-7f2">
+      <button class="btn primary" id="btn-save-topic" style="margin-top:12px;">儲存主題設定</button>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn ghost" id="btn-test-topic" style="flex:1;">1. 測試一般通知</button>
+        <button class="btn primary" id="btn-test-schedule" style="flex:1; background:var(--green); color:#fff;">2. 強制測試週一課表</button>
+      </div>
+      <div class="status-line" id="set-status"></div>
+    </div>
+
+    <div class="card">
+      <h2>⏰ 每天 19:00 自動傳送（保底排程設定）</h2>
+      <p class="desc">
+        要讓孩子手機每天晚上 19:00 準時收到明天課表，最穩定的方法是免費註冊 <a href="https://cron-job.org" target="_blank" style="color:var(--copper);">cron-job.org</a>。點擊下方按鈕可產生專屬設定值，直接複製貼上即可！
+      </p>
+      <button class="btn primary" id="btn-gen-cron">產生 5 組每日排程設定</button>
+      <div id="cron-output"></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  const PERIODS = [
+    {id:'z',label:'早自習',time:'07:30–07:50',isClass:false},
+    {id:1,label:'第一節',time:'08:10–09:00'},
+    {id:2,label:'第二節',time:'09:10–10:00'},
+    {id:3,label:'第三節',time:'10:10–11:00'},
+    {id:4,label:'第四節',time:'11:10–12:00'},
+    {id:'l',label:'午休',time:'12:00–13:10',isClass:false},
+    {id:5,label:'第五節',time:'13:10–14:00'},
+    {id:6,label:'第六節',time:'14:10–15:00'},
+    {id:7,label:'第七節',time:'15:15–16:05'},
+    {id:8,label:'第八節',time:'16:10–17:00'},
+  ];
+  const DAYNAMES = {1:'週一',2:'週二',3:'週三',4:'週四',5:'週五'};
+  const WEEK = {
+    1:{1:['國語文','陳姿穎'],2:['基礎電子實習','黃筱涓、吳育智'],3:['基礎電子實習','黃筱涓、吳育智'],4:['基礎電子實習','黃筱涓、吳育智'],5:['程式設計實習','黃筱涓、吳育智'],6:['程式設計實習','黃筱涓、吳育智'],7:['程式設計實習','黃筱涓、吳育智'],8:['數位電路選','張偉勤']},
+    2:{1:['數位電路','張偉勤'],2:['數位電路','張偉勤'],3:['英語文','林宗平(外師)'],4:['英語文','林宗平(外師)'],5:['地理','邱坤豪'],6:['地理','邱坤豪'],7:['健康與護理','陸淑芬'],8:['基本電學選','吳育智']},
+    3:{1:['體育','莊佳容'],2:['體育','莊佳容'],3:['臺灣手語／閩南語文','范文芳、宋麗華'],4:['基本電學','吳育智'],5:['班會','林宗平'],6:['彈性學習時間',''],7:['團體活動時間',''],8:null},
+    4:{1:['數學','林佳良'],2:['數學','林佳良'],3:['基本電學','吳育智'],4:['基本電學','吳育智'],5:['作文','陳姿穎'],6:['物理','徐慧茵'],7:['物理','徐慧茵'],8:null},
+    5:{1:['國語文','陳姿穎'],2:['國語文','陳姿穎'],3:['美術','徐珮玲(美術教室)'],4:['美術','徐珮玲(美術教室)'],5:['數學','林佳良'],6:['數學','林佳良'],7:['英語聽講','林宗平'],8:['英文選','林宗平']},
+  };
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => document.querySelectorAll(s);
+
+  const HAS_CLAUDE_STORAGE = !!(window.storage && typeof window.storage.get === 'function');
+  const LS_PREFIX = 'schedule-app:';
+
+  async function getVal(key, fallback){
+    if(HAS_CLAUDE_STORAGE){
+      try{ const r = await window.storage.get(key, true); return r ? JSON.parse(r.value) : fallback; }
+      catch(e){ return fallback; }
+    }
+    try{
+      const raw = localStorage.getItem(LS_PREFIX + key);
+      return raw !== null ? JSON.parse(raw) : fallback;
+    }catch(e){ return fallback; }
+  }
+  async function setVal(key, val){
+    if(HAS_CLAUDE_STORAGE){
+      try{ await window.storage.set(key, JSON.stringify(val), true); }catch(e){ console.error(e); }
+      return;
+    }
+    try{ localStorage.setItem(LS_PREFIX + key, JSON.stringify(val)); }catch(e){ console.error(e); }
+  }
+
+  let TOPIC = '';
+  let EVENTS = [];
+  let SOUND_ON = true;
+  let THEME_DARK = false;
+
+  async function getPersonal(key, fallback){
+    if(HAS_CLAUDE_STORAGE){
+      try{ const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : fallback; }
+      catch(e){ return fallback; }
+    }
+    try{
+      const raw = localStorage.getItem(LS_PREFIX + key);
+      return raw !== null ? JSON.parse(raw) : fallback;
+    }catch(e){ return fallback; }
+  }
+  async function setPersonal(key, val){
+    if(HAS_CLAUDE_STORAGE){
+      try{ await window.storage.set(key, JSON.stringify(val), false); }catch(e){ console.error(e); }
+      return;
+    }
+    try{ localStorage.setItem(LS_PREFIX + key, JSON.stringify(val)); }catch(e){ console.error(e); }
+  }
+
+  let audioCtx = null;
+  function playClick(){
+    if(!SOUND_ON) return;
+    try{
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(720, t0);
+      osc.frequency.exponentialRampToValueAtTime(420, t0 + 0.05);
+      gain.gain.setValueAtTime(0.06, t0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.08);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(t0); osc.stop(t0 + 0.08);
+    }catch(e){}
+  }
+  document.addEventListener('click', (e)=>{
+    if(e.target.closest('button')) playClick();
+  }, true);
+
+  function applyTheme(){
+    document.body.classList.toggle('theme-dark', THEME_DARK);
+    const btn = document.getElementById('btn-theme');
+    btn.textContent = THEME_DARK ? '☀️' : '🌙';
+    btn.classList.toggle('on', THEME_DARK);
+    btn.setAttribute('aria-pressed', String(THEME_DARK));
+  }
+  function applySoundBtn(){
+    const btn = document.getElementById('btn-sound');
+    btn.textContent = SOUND_ON ? '🔊' : '🔇';
+    btn.classList.toggle('on', SOUND_ON);
+    btn.setAttribute('aria-pressed', String(SOUND_ON));
+  }
+  document.getElementById('btn-theme').addEventListener('click', async ()=>{
+    THEME_DARK = !THEME_DARK;
+    applyTheme();
+    await setPersonal('theme-dark', THEME_DARK);
+  });
+  document.getElementById('btn-sound').addEventListener('click', async ()=>{
+    SOUND_ON = !SOUND_ON;
+    applySoundBtn();
+    await setPersonal('sound-on', SOUND_ON);
+    if(SOUND_ON) playClick();
+  });
+
+  function encodeHeaderValue(str){
+    if(/^[\x00-\x7F]*$/.test(str)) return str;
+    const b64 = btoa(unescape(encodeURIComponent(str)));
+    return `=?UTF-8?B?${b64}?=`;
+  }
+  async function publish(topic, {title, body, delaySeconds}){
+    if(!topic) throw new Error('尚未設定 ntfy 主題');
+    const headers = {'Title': encodeHeaderValue(title)};
+    if(delaySeconds !== undefined){
+      const ts = Math.floor(Date.now()/1000) + delaySeconds;
+      headers['Delay'] = String(ts);
+    }
+    const res = await fetch('https://ntfy.sh/' + encodeURIComponent(topic), {
+      method:'POST', body, headers
+    });
+    if(!res.ok) throw new Error('ntfy 回應錯誤：' + res.status);
+    return res;
+  }
+
+  function dayScheduleLines(dow){
+    const day = WEEK[dow];
+    if(!day) return [];
+    const lines = [];
+    for(const p of PERIODS){
+      if(!p.isClass){ continue; }
+      const info = day[p.id];
+      if(!info || !info[0]) continue;
+      lines.push(`${p.label} ${p.time}｜${info[0]}${info[1] ? '（'+info[1]+'）':''}`);
+    }
+    return lines;
+  }
+  function dayScheduleText(dow){
+    const lines = dayScheduleLines(dow);
+    if(lines.length===0) return '明天是週末，沒有安排課程喔！🎉';
+    return lines.join('\n');
+  }
+
+  function renderHome(){
+    const today = new Date();
+    const todayDow = today.getDay();
+    $('#home-day').textContent = DAYNAMES[todayDow] ? (DAYNAMES[todayDow]+'　'+fmtDate(today)) : (fmtDate(today)+'（假日）');
+    const todayLines = dayScheduleLines(todayDow);
+    $('#home-count').textContent = todayLines.length;
+    $('#home-today-list').innerHTML = listHtml(todayLines, todayDow);
+
+    const tmr = new Date(); tmr.setDate(tmr.getDate()+1);
+    const tmrDow = tmr.getDay();
+    const tmrLines = dayScheduleLines(tmrDow);
+    $('#home-tomorrow-list').innerHTML = listHtml(tmrLines, tmrDow);
+  }
+  function fmtDate(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
+  function listHtml(lines, dow){
+    if(!DAYNAMES[dow]) return `<div class="empty-state">週末放假，沒有安排課表 🎉</div>`;
+    if(lines.length===0) return `<div class="empty-state">這天沒有課程</div>`;
+    return '<div style="display:flex;flex-direction:column;gap:6px;">' + lines.map(l=>{
+      const [head, rest] = l.split('｜');
+      return `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--board-2);border-radius:8px;font-size:12.5px;">
+        <span class="mono" style="color:var(--muted);white-space:nowrap;">${head}</span>
+        <span style="text-align:right;font-weight:600;">${rest||''}</span>
+      </div>`;
+    }).join('') + '</div>';
+  }
+
+  function renderWeek(){
+    const todayDow = new Date().getDay();
+    let html = '<thead><tr><th>節次</th>';
+    for(let d=1;d<=5;d++){
+      html += `<th class="${d===todayDow?'wk-active':''}">${DAYNAMES[d]}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+    for(const p of PERIODS){
+      if(!p.isClass){
+        html += `<tr class="break"><th>${p.label}<span class="time">${p.time}</span></th>`;
+        for(let d=1;d<=5;d++) html += `<td>—</td>`;
+        html += '</tr>';
+        continue;
+      }
+      html += `<tr><th>${p.label}<span class="time">${p.time}</span></th>`;
+      for(let d=1;d<=5;d++){
+        const info = WEEK[d][p.id];
+        const cls = 'cell' + (d===todayDow?' today-col':'');
+        if(!info || !info[0]){ html += `<td class="${cls} empty">—</td>`; continue; }
+        html += `<td class="${cls}">${info[0]}${info[1]?`<span class="t">${info[1]}</span>`:''}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+    $('#week-table').innerHTML = html;
+  }
+
+  function renderEvents(){
+    const list = $('#ev-list');
+    if(EVENTS.length===0){ list.innerHTML = '<div class="empty-state">還沒有新增行程</div>'; return; }
+    const sorted = [...EVENTS].sort((a,b)=> a.ts - b.ts);
+    list.innerHTML = sorted.map(ev=>{
+      const d = new Date(ev.ts);
+      const status = ev.scheduled ? `<span class="ev-status st-scheduled">已排定 ntfy 通知</span>` : `<span class="ev-status st-far">超過 3 天，等待自動補排</span>`;
+      return `<div class="ev-item">
+        <div class="ev-date"><div class="d">${d.getDate()}</div><div class="m">${d.getMonth()+1} 月</div></div>
+        <div class="ev-body">
+          <div class="ev-title">${escapeHtml(ev.title)}</div>
+          <div class="ev-meta">${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}　${ev.note?escapeHtml(ev.note):''}</div>
+          ${status}
+        </div>
+        <div class="ev-actions">
+          <button class="btn small ghost" data-del="${ev.id}">刪除</button>
+        </div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('[data-del]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        EVENTS = EVENTS.filter(e=>e.id!==btn.dataset.del);
+        await setVal('calendar-events', EVENTS);
+        renderEvents();
+      });
+    });
+  }
+  function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+  async function autoRescheduleUpcoming(){
+    const now = Date.now();
+    const THREE_DAYS = 3*24*60*60*1000 - 60*1000;
+    let changed = false;
+    for(const ev of EVENTS){
+      if(ev.scheduled) continue;
+      const diff = ev.ts - now;
+      if(diff > 0 && diff <= THREE_DAYS && TOPIC){
+        try{
+          await publish(TOPIC, {title:'📌 '+ev.title, body: ev.note || '行事曆提醒', delaySeconds: Math.floor(diff/1000)});
+          ev.scheduled = true; ev.scheduledAt = now;
+          changed = true;
+        }catch(e){ console.error(e); }
+      }
+    }
+    if(changed) await setVal('calendar-events', EVENTS);
+  }
+
+  const CRON_DOW_FOR = {1:0, 2:1, 3:2, 4:3, 5:4}; 
+  function buildCronCards(topic){
+    if(!topic){ return '<div class="status-line err" style="display:block;">請先在上方輸入並儲存 ntfy 主題名稱</div>'; }
+    let html = '';
+    for(let d=1; d<=5; d++){
+      const text = dayScheduleText(d);
+      const cronExpr = `0 19 * * ${CRON_DOW_FOR[d]}`;
+      const url = `https://ntfy.sh/${topic}`;
+      html += `<div class="cron-card">
+        <h3>${DAYNAMES[d]}的課（於前一天 19:00 送出）</h3>
+        <div class="kv"><div class="k">排程</div><div class="v">${cronExpr}<button class="btn small copybtn" data-copy="${cronExpr}">複製</button></div></div>
+        <div class="kv"><div class="k">URL</div><div class="v">${url}<button class="btn small copybtn" data-copy="${url}">複製</button></div></div>
+        <div class="kv"><div class="k">Method</div><div class="v">POST</div></div>
+        <div class="kv"><div class="k">Header</div><div class="v">Title: 📚 明天課表（${DAYNAMES[d]}）<button class="btn small copybtn" data-copy="Title: 📚 明天課表（${DAYNAMES[d]}）">複製</button></div></div>
+        <div class="kv"><div class="k">內容</div><div class="v" style="white-space:pre-wrap;">${text}<button class="btn small copybtn" data-copy="${text.replace(/"/g,'&quot;')}">複製</button></div></div>
+      </div>`;
+    }
+    html = `<div class="warn-box">在 <b>cron-job.org</b> 免費註冊後，建立 5 個 Cron Job，時區選擇 <b>Asia/Taipei</b>，複製貼上各欄位即可。</div>` + html;
+    return html;
+  }
+
+  function switchView(view){
+    $$('nav button').forEach(b=> b.classList.toggle('active', b.dataset.view===view));
+    $$('.view').forEach(v=> v.classList.toggle('active', v.id==='view-'+view));
+  }
+  $$('nav button').forEach(b=> b.addEventListener('click', ()=> switchView(b.dataset.view)));
+
+  $('#btn-save-topic').addEventListener('click', async ()=>{
+    TOPIC = $('#set-topic').value.trim();
+    await setVal('ntfy-topic', TOPIC);
+    showStatus('#set-status', TOPIC ? '已儲存主題：'+TOPIC : '請輸入主題名稱', TOPIC?'ok':'err');
+  });
+  $('#btn-test-topic').addEventListener('click', async ()=>{
+    try{
+      await publish(TOPIC, {title:'🔔 連線測試通知', body:'課表控制台連線成功！'});
+      showStatus('#set-status','連線測試通知已送出，請確認手機是否收到！','ok');
+    }catch(e){ showStatus('#set-status', '送出失敗：'+e.message, 'err'); }
+  });
+
+  async function sendSchedule(targetDow){
+    const scheduleText = dayScheduleText(targetDow);
+    const dayName = DAYNAMES[targetDow] || '週末';
+    try{
+      await publish(TOPIC, {title:`📚 課表推播測試（${dayName}）`, body: scheduleText});
+      return true;
+    }catch(e){
+      throw e;
+    }
+  }
+
+  $('#btn-test-schedule').addEventListener('click', async ()=>{
+    try{
+      // 強制推播週一課表做功能驗證
+      await sendSchedule(1);
+      showStatus('#set-status','已成功發送「週一課表」至孩子手機，請查看推播！','ok');
+    }catch(e){ showStatus('#set-status','送出失敗：'+e.message,'err'); }
+  });
+
+  $('#btn-send-tomorrow').addEventListener('click', async ()=>{
+    const tmr = new Date(); tmr.setDate(tmr.getDate()+1);
+    const dow = tmr.getDay();
+    try{
+      await sendSchedule(dow === 0 || dow === 6 ? 1 : dow); // 若明天是週末，自動切換為週一課表發送做驗證
+      showStatus('#home-status','明天課表通知已成功發送！','ok');
+    }catch(e){ showStatus('#home-status','送出失敗：'+e.message,'err'); }
+  });
+
+  $('#btn-gen-cron').addEventListener('click', ()=>{
+    $('#cron-output').innerHTML = buildCronCards(TOPIC);
+    $('#cron-output').querySelectorAll('[data-copy]').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        navigator.clipboard.writeText(b.dataset.copy);
+        const orig = b.textContent; b.textContent='已複製'; setTimeout(()=>b.textContent=orig,1200);
+      });
+    });
+  });
+
+  $('#btn-add-event').addEventListener('click', async ()=>{
+    const title = $('#ev-title').value.trim();
+    const date = $('#ev-date').value;
+    const time = $('#ev-time').value || '19:00';
+    const note = $('#ev-note').value.trim();
+    if(!title || !date){ showStatus('#ev-status','請填寫標題與日期','err'); return; }
+    const ts = new Date(`${date}T${time}:00`).getTime();
+    const ev = {id: 'ev_'+Date.now(), title, note, ts, scheduled:false};
+    const now = Date.now();
+    const diff = ts - now;
+    const THREE_DAYS = 3*24*60*60*1000 - 60*1000;
+    if(diff > 0 && diff <= THREE_DAYS && TOPIC){
+      try{
+        await publish(TOPIC, {title:'📌 '+title, body: note || '行事曆提醒', delaySeconds: Math.floor(diff/1000)});
+        ev.scheduled = true; ev.scheduledAt = now;
+      }catch(e){ console.error(e); }
+    }
+    EVENTS.push(ev);
+    await setVal('calendar-events', EVENTS);
+    $('#ev-title').value=''; $('#ev-date').value=''; $('#ev-note').value='';
+    renderEvents();
+    showStatus('#ev-status', ev.scheduled ? '已加入並排定通知' : '已加入行事曆', 'ok');
+  });
+
+  function showStatus(sel, msg, kind){
+    const el = $(sel);
+    el.textContent = msg;
+    el.className = 'status-line ' + kind;
+  }
+
+  (async function init(){
+    TOPIC = await getVal('ntfy-topic', '');
+    EVENTS = await getVal('calendar-events', []);
+    THEME_DARK = await getPersonal('theme-dark', false);
+    SOUND_ON = await getPersonal('sound-on', true);
+    applyTheme();
+    applySoundBtn();
+    $('#set-topic').value = TOPIC;
+    renderHome();
+    renderWeek();
+    renderEvents();
+    await autoRescheduleUpcoming();
+    renderEvents();
+  })();
+})();
+</script>
+</body>
+</html>
+
