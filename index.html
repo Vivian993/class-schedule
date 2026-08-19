@@ -125,6 +125,7 @@
     padding:16px; margin-bottom:16px;
     box-shadow:0 1px 0 rgba(22,35,28,0.03);
   }
+  #add-event-card{ scroll-margin-top:160px; }
   .card h2{margin:0 0 4px; font-size:15px; display:flex; align-items:center; gap:8px;}
   .card .desc{color:var(--muted); font-size:12.5px; margin:0 0 14px; line-height:1.6;}
 
@@ -807,9 +808,7 @@
     } else {
       selectedCalDateStr = dStr;
       $('#ev-date').value = dStr;
-      const targetCard = document.getElementById('add-event-card');
-      if(targetCard) targetCard.scrollIntoView({behavior:'smooth', block:'start'});
-      setTimeout(()=>{ const t=$('#ev-title'); if(t) t.focus(); }, 350);
+      // 不自動捲動、不自動彈鍵盤，讓月曆保持在畫面上，使用者自己往下滑填表單
     }
     renderCalendar();
     renderEvents();
