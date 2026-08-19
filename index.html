@@ -390,6 +390,19 @@
       <button class="btn primary" id="btn-gen-cron">產生一鍵發送專屬網址</button>
       <div id="cron-output"></div>
     </div>
+
+    <div class="card">
+      <h2>💾 備份與還原</h2>
+      <p class="desc">行程與設定存在瀏覽器裡，換手機或清除瀏覽器資料就會不見。建議偶爾下載一份備份檔保存起來。</p>
+      <div style="display:flex; gap:8px;">
+        <button class="btn primary" id="btn-export-data" style="flex:1;">⬇️ 下載備份</button>
+        <label class="btn ghost" style="flex:1; text-align:center; cursor:pointer;">
+          ⬆️ 匯入備份
+          <input type="file" id="btn-import-data" accept=".json" style="display:none;">
+        </label>
+      </div>
+      <div class="status-line" id="backup-status"></div>
+    </div>
   </section>
 
 </main>
@@ -730,12 +743,9 @@
     $('#cal-month-title').textContent = `${year} 年 ${month + 1} 月`;
 
     const grid = $('#cal-grid');
-    grid.innerHTML = '';
 
     const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-    weekDays.forEach(wd => {
-      grid.innerHTML += `<div class="cal-day-head">${wd}</div>`;
-    });
+    let gridHtml = weekDays.map(wd => `<div class="cal-day-head">${wd}</div>`).join('');
 
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
@@ -753,7 +763,7 @@
     const prevMonthLastDay = new Date(year, month, 0).getDate();
     for (let i = startDayOfWeek - 1; i >= 0; i--) {
       const dNum = prevMonthLastDay - i;
-      grid.innerHTML += `<div class="cal-cell other-month"><span class="cal-num">${dNum}</span></div>`;
+      gridHtml += `<div class="cal-cell other-month"><span class="cal-num">${dNum}</span></div>`;
     }
 
     for (let d = 1; d <= totalDays; d++) {
@@ -772,33 +782,36 @@
         dotsHtml = '<div class="cal-dots">' + '<div class="cal-dot"></div>'.repeat(Math.min(evCount, 3)) + '</div>';
       }
 
-      const cell = document.createElement('div');
-      cell.className = `cal-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`;
-      cell.innerHTML = `<span class="cal-num">${d}</span>${dotsHtml}`;
-      cell.addEventListener('click', () => {
-        if(selectedCalDateStr === dStr){
-          selectedCalDateStr = null;
-        } else {
-          selectedCalDateStr = dStr;
-          $('#ev-date').value = dStr;
-          // 點選日期後，捲動到新增行程表單並聚焦標題欄位，方便直接輸入時間
-          const targetCard = document.getElementById('add-event-card');
-          if(targetCard) targetCard.scrollIntoView({behavior:'smooth', block:'start'});
-          setTimeout(()=>{ const t=$('#ev-title'); if(t) t.focus(); }, 350);
-        }
-        renderCalendar();
-        renderEvents();
-        renderCalSelectHint();
-      });
-      grid.appendChild(cell);
+      gridHtml += `<div class="cal-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" data-date="${dStr}"><span class="cal-num">${d}</span>${dotsHtml}</div>`;
     }
 
     const totalRendered = startDayOfWeek + totalDays;
     const remaining = (7 - (totalRendered % 7)) % 7;
     for (let i = 1; i <= remaining; i++) {
-      grid.innerHTML += `<div class="cal-cell other-month"><span class="cal-num">${i}</span></div>`;
+      gridHtml += `<div class="cal-cell other-month"><span class="cal-num">${i}</span></div>`;
     }
+
+    grid.innerHTML = gridHtml;
   }
+
+  // 用事件代理綁在月曆容器上，不管畫面重繪幾次都不會失效
+  $('#cal-grid').addEventListener('click', (e) => {
+    const cell = e.target.closest('.cal-cell[data-date]');
+    if(!cell) return;
+    const dStr = cell.dataset.date;
+    if(selectedCalDateStr === dStr){
+      selectedCalDateStr = null;
+    } else {
+      selectedCalDateStr = dStr;
+      $('#ev-date').value = dStr;
+      const targetCard = document.getElementById('add-event-card');
+      if(targetCard) targetCard.scrollIntoView({behavior:'smooth', block:'start'});
+      setTimeout(()=>{ const t=$('#ev-title'); if(t) t.focus(); }, 350);
+    }
+    renderCalendar();
+    renderEvents();
+    renderCalSelectHint();
+  });
 
   $('#cal-prev').addEventListener('click', () => {
     currentCalDate.setMonth(currentCalDate.getMonth() - 1);
@@ -995,6 +1008,49 @@
     el.textContent = msg;
     el.className = 'status-line ' + kind;
   }
+
+  $('#btn-export-data').addEventListener('click', ()=>{
+    const backup = {
+      ntfyTopic: TOPIC,
+      calendarEvents: EVENTS,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dstr = new Date().toISOString().split('T')[0];
+    a.download = `課表控制台備份_${dstr}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showStatus('#backup-status', '備份已下載！', 'ok');
+  });
+
+  $('#btn-import-data').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt)=>{
+      try{
+        const data = JSON.parse(evt.target.result);
+        if(typeof data.ntfyTopic === 'string'){
+          TOPIC = data.ntfyTopic;
+          await setVal('ntfy-topic', TOPIC);
+          $('#set-topic').value = TOPIC;
+        }
+        if(Array.isArray(data.calendarEvents)){
+          EVENTS = data.calendarEvents;
+          await setVal('calendar-events', EVENTS);
+        }
+        renderCalendar();
+        renderEvents();
+        showStatus('#backup-status', '匯入成功！', 'ok');
+      }catch(err){
+        showStatus('#backup-status', '匯入失敗，檔案格式不正確', 'err');
+      }
+    };
+    reader.readAsText(file);
+  });
 
   (async function init(){
     TOPIC = await getVal('ntfy-topic', '');
