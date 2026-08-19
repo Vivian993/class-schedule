@@ -846,14 +846,7 @@
     let filtered = [...EVENTS];
     const toggleBtn = $('#btn-toggle-all-events');
 
-    if(selectedCalDateStr){
-      $('#ev-list-title').textContent = `📌 ${selectedCalDateStr} 當日行程`;
-      filtered = filtered.filter(ev => {
-        const dStr = new Date(ev.ts).toISOString().split('T')[0];
-        return dStr === selectedCalDateStr;
-      });
-      toggleBtn.style.display = 'none';
-    } else if(!showAllEvents){
+    if(!showAllEvents){
       const y = currentCalDate.getFullYear();
       const m = currentCalDate.getMonth();
       $('#ev-list-title').textContent = `📌 ${y} 年 ${m+1} 月行程`;
@@ -870,7 +863,7 @@
     }
 
     if(filtered.length === 0){
-      list.innerHTML = `<div class="empty-state">${selectedCalDateStr ? '該日無行程事件' : '這個月還沒有行程'}</div>`;
+      list.innerHTML = `<div class="empty-state">這個月還沒有行程</div>`;
       return;
     }
 
