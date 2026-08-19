@@ -359,7 +359,10 @@
     </div>
 
     <div class="card">
-      <h2 id="ev-list-title">📌 行程列表</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <h2 id="ev-list-title" style="margin:0;">📌 行程列表</h2>
+        <button class="btn small ghost" id="btn-toggle-all-events">顯示全部行程</button>
+      </div>
       <div id="ev-list"></div>
     </div>
   </section>
@@ -816,10 +819,12 @@
   $('#cal-prev').addEventListener('click', () => {
     currentCalDate.setMonth(currentCalDate.getMonth() - 1);
     renderCalendar();
+    renderEvents();
   });
   $('#cal-next').addEventListener('click', () => {
     currentCalDate.setMonth(currentCalDate.getMonth() + 1);
     renderCalendar();
+    renderEvents();
   });
 
   // ---------- 新增：計算行程倒數天數的顯示文字 ----------
@@ -834,9 +839,13 @@
     return {text:`${daysDiff} 天後`, today:false};
   }
 
+  let showAllEvents = false;
+  let expiredExpanded = false;
+
   function renderEvents(){
     const list = $('#ev-list');
     let filtered = [...EVENTS];
+    const toggleBtn = $('#btn-toggle-all-events');
 
     if(selectedCalDateStr){
       $('#ev-list-title').textContent = `📌 ${selectedCalDateStr} 當日行程`;
@@ -844,17 +853,33 @@
         const dStr = new Date(ev.ts).toISOString().split('T')[0];
         return dStr === selectedCalDateStr;
       });
+      toggleBtn.style.display = 'none';
+    } else if(!showAllEvents){
+      const y = currentCalDate.getFullYear();
+      const m = currentCalDate.getMonth();
+      $('#ev-list-title').textContent = `📌 ${y} 年 ${m+1} 月行程`;
+      filtered = filtered.filter(ev => {
+        const d = new Date(ev.ts);
+        return d.getFullYear() === y && d.getMonth() === m;
+      });
+      toggleBtn.style.display = 'inline-block';
+      toggleBtn.textContent = '顯示全部行程';
     } else {
       $('#ev-list-title').textContent = '📌 全部行程列表';
+      toggleBtn.style.display = 'inline-block';
+      toggleBtn.textContent = '只看當月';
     }
 
     if(filtered.length === 0){
-      list.innerHTML = `<div class="empty-state">${selectedCalDateStr ? '該日無行程事件' : '還沒有新增行程'}</div>`;
+      list.innerHTML = `<div class="empty-state">${selectedCalDateStr ? '該日無行程事件' : '這個月還沒有行程'}</div>`;
       return;
     }
 
-    const sorted = filtered.sort((a,b)=> a.ts - b.ts);
-    list.innerHTML = sorted.map(ev=>{
+    const now = Date.now();
+    const upcoming = filtered.filter(ev => ev.ts >= now).sort((a,b)=> a.ts - b.ts);
+    const expired = filtered.filter(ev => ev.ts < now).sort((a,b)=> b.ts - a.ts);
+
+    const renderItem = (ev) => {
       const d = new Date(ev.ts);
       const status = ev.scheduled ? `<span class="ev-status st-scheduled">已排定 ntfy 通知</span>` : `<span class="ev-status st-far">超過 3 天，等待自動補排</span>`;
       const cd = countdownLabel(ev.ts);
@@ -870,10 +895,38 @@
           <button class="btn small ghost" data-del="${ev.id}">刪除</button>
         </div>
       </div>`;
-    }).join('');
+    };
+
+    let html = upcoming.map(renderItem).join('');
+
+    if(expired.length > 0){
+      html += `<div id="expired-toggle" style="text-align:center; padding:10px 4px; cursor:pointer; color:var(--muted); font-size:12px; font-weight:700; border-top:1px dashed var(--line); margin-top:4px;">
+        ${expiredExpanded ? '▲ 收合已過期行程' : `▾ 已過期行程（${expired.length} 筆），點擊展開`}
+      </div>`;
+      if(expiredExpanded){
+        html += expired.map(renderItem).join('');
+      }
+    }
+
+    if(upcoming.length === 0 && expired.length > 0 && !expiredExpanded){
+      html = `<div class="empty-state">這個範圍內沒有即將到來的行程</div>` + html;
+    }
+
+    list.innerHTML = html;
+
+    const expiredToggle = document.getElementById('expired-toggle');
+    if(expiredToggle){
+      expiredToggle.addEventListener('click', ()=>{
+        expiredExpanded = !expiredExpanded;
+        renderEvents();
+      });
+    }
 
     list.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
+        const target = EVENTS.find(e=>e.id===btn.dataset.del);
+        const name = target ? target.title : '這筆行程';
+        if(!window.confirm(`確定要刪除「${name}」嗎？`)) return;
         EVENTS = EVENTS.filter(e=>e.id!==btn.dataset.del);
         await setVal('calendar-events', EVENTS);
         renderCalendar();
@@ -881,6 +934,10 @@
       });
     });
   }
+  $('#btn-toggle-all-events').addEventListener('click', ()=>{
+    showAllEvents = !showAllEvents;
+    renderEvents();
+  });
   function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
   async function autoRescheduleUpcoming(){
